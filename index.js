@@ -29,6 +29,7 @@ module.exports = function(app) {
   var plugin = {}
   var onStop = []
   var statusMessage
+  var sentUnavailableAlarm
 
   const setProviderStatus = app.setProviderStatus
         ? (msg) => {
@@ -76,6 +77,15 @@ module.exports = function(app) {
       }, (error, response, body) => {
         if (!error && response.statusCode === 200) {
           setProviderStatus(`Connected to ${ip}`)
+
+          if ( sentUnavailableAlarm ) {
+            sentUnavailableAlarm = false
+            app.handleMessage(plugin.id,
+                              getAlarmDelta(app,
+                                            'notifications.redhead.daqUnavailable',
+                                            'normal',
+                                            'The DAQ module is now available'))
+          }
 
           // Change the following code to process the XML
           _.keys(body).forEach(key => {
@@ -154,6 +164,12 @@ module.exports = function(app) {
             })
           })
         } else {
+          app.handleMessage(plugin.id,
+                            getAlarmDelta(app,
+                                          'notifications.redhead.daqUnavailable',
+                                          'alert',
+                                          'The DAQ module is unavailable'))
+          sentUnavailableAlarm = true
           printRequestError(error, response)
         }
       })
@@ -183,3 +199,23 @@ module.exports = function(app) {
   return plugin;
 }
 
+
+function getAlarmDelta(app, path, state, message)
+{
+  var delta = {
+      updates: [
+        {
+          values: [
+            {
+              path: path,
+              value: {
+                state: state,
+                method: [ "visual", "sound" ],
+                message: message
+              }
+            }]
+        }
+      ]
+  }
+  return delta;
+}
